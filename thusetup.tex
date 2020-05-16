@@ -54,7 +54,7 @@
   %
   % 姓名
   %
-  author  = {赵鋆峰},
+  author  = {赵\hbox{\lower-0.67ex\hbox{\scalebox{1}[0.6]{均}}\lower.2ex\hbox{\kern-1em \scalebox{1}[0.5]{金}}}峰},
   author* = {Zhao Yunfeng},
   %
   % 指导教师
@@ -120,6 +120,38 @@
 
 % 定理类环境宏包
 \usepackage[amsmath,thmmarks,hyperref]{ntheorem}
+
+% 支持算法
+\usepackage{algorithm}
+\usepackage{algorithmicx}
+\usepackage{algpseudocode}
+\usepackage{fixltx2e}
+
+\renewcommand{\algorithmicrequire}{\textbf{输入:}}
+\renewcommand{\algorithmicensure}{\textbf{输出:}}
+\MakeRobust{\Call}
+
+\makeatletter
+\newenvironment{breakablealgorithm}
+  {% \begin{breakablealgorithm}
+   \begin{center}
+     \refstepcounter{algorithm}% New algorithm
+     \hrule height.8pt depth0pt \kern2pt% \@fs@pre for \@fs@ruled
+     \renewcommand{\caption}[2][\relax]{% Make a new \caption
+       {\raggedright\textbf{\ALG@name~\thealgorithm} ##2\par}%
+       \ifx\relax##1\relax % #1 is \relax
+         \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##2}%
+       \else % #1 is not \relax
+         \addcontentsline{loa}{algorithm}{\protect\numberline{\thealgorithm}##1}%
+       \fi
+       %\kern2pt\hrule\kern2pt
+     }
+  }{% \end{breakablealgorithm}
+     %\kern2pt\hrule\relax% \@fs@post for \@fs@ruled
+   \end{center}
+  }
+\makeatother
+
 
 % 给自定义的宏后面自动加空白
 % \usepackage{xspace}
