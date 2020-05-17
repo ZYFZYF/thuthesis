@@ -7,8 +7,8 @@
 首先我们形式化地描述一下时间序列异常检测问题。一个时间序列是等时间间隔收集到的各个指标的值，定义为${\rm x}=\{{\rm x}_1,{\rm x}_2,\dots,{\rm x}_N\}$，$N$是收集的次数。由于本文考虑的是多元时间序列的异常检测，所以每个时间都会有多个监测指标的值，也就是其中${\rm x}_t\in R^M$，${\rm x}_t=[x_t^1,x_t^2,\dots,x_t^M]$，其中$t\leq N$，$M$是数据的维度。所以${\rm x}\in R^{N\times M}$。我们最终目标是输出一个$y=[y_1, y_2,\dots, y_N ]$，其中$y_t\in \{0,1\}$，$y_t=0$代表该时刻检测到的指标正常，否则认为发现一个异常。图\ref{fig:anomaly_example}展示了一个异常。
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{anomaly_example.png}
-  \caption{多维时间序列数据中的一个异常示例}
+  \includegraphics[width=\textwidth]{another_anomaly_example.png}
+  \caption{多维时间序列数据中的一个异常示例，其中标红部分为一个异常}
   \label{fig:anomaly_example}
 \end{figure}
 
@@ -201,7 +201,6 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
   如果我们能够以一个较低的复杂度支持动态的在$P$中增加、减少一个异常区间同时计算Precision和Recall的值，那么就能高效的求解best F1-Score。具体来讲，我们通过记录中间变量的方式来记录计算过程中的中间状态，通过并查集的方式来快速维护$P$。具体的算法过程如下：
 
-  \footnotesize
   \begin{breakablealgorithm}
     \caption{高效的Best F1-Score计算方式}
     \begin{algorithmic}[1]
@@ -211,6 +210,9 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
       \State $rangeOverlapCount \gets [0] * N_r$
       \State $Recall \gets 0$
       \State $Precision \gets 0$
+
+      \State
+
       \Function {computeBestF1Score}{R,S}
       \State bestF1Score = 0
       \State S \gets sorted(S) in descending order
@@ -230,6 +232,8 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
       \EndFor
       \State \Return bestF1Score
       \EndFunction
+      
+      \State
 
       \Function {addPredictRange}{p}
       \State Recall \gets 0
@@ -246,6 +250,8 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
       \EndFor
       \State $Recall /= N_r$
 
+      \State
+
       \State reward \gets 0
       \ForAll $R_i \in R$
             \State $reward += \omega(p, p \cap R_i)$
@@ -253,6 +259,8 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
       \State $Precision \gets \frac{Precision \times N_p + reward}{N_p + 1}$
       \State $N_p += 1$
       \EndFunction
+
+      \State
 
       \Function {dropPredictRange}{p}
       \State Recall \gets 0
@@ -267,6 +275,9 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
             \State $overlapReward \gets rangeReward_i$
             \State $Recall += \alpha \times existReward + (1-\alpha) \times overlapReward$
       \EndFor
+
+      \State
+
       \State $Recall /= N_r$
 
       \State reward \gets 0
@@ -277,10 +288,20 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
       \State $N_p -= 1$
       \EndFunction
     \end{algorithmic}
-    \end{breakablealgorithm}
-  
+  \end{breakablealgorithm}
   其中getRange和Union是通过并查集来实现记录和维护某个位置所属的区间以及该区间的左右端点，算法中不再赘述。容易得知这样的计算复杂度为$O(N_r\times N)$，较原先下降了一个数量级，实测原先需要4小时的计算仅需3秒就可以得出结果。
-\section{运行结果}
-最终的结果如下：
+\section{实验结果与分析}
+我们考虑实验结果主要从三方面来分析，一方面是各个模型在best F1-Score上的表现，也就是模型上限的衡量。再一方面，我们考虑各个模型在用POT确立阈值之后的表现，最后，我们还要关注各个模型的效率问题，尤其是测试阶段的效率，因为这影响到我们模型的上限。
+
+在best F1-Score上的表现，各个模型的结果如表所示，其中各个指标的计算方式是由28台机器的结果取平均得到。除了本文实现的模型外，我们还加入了当前state-of-the-art的工作OminiAnomaly\cite{su2019robust}的输出结果来评价，方便做对比。
+
+我们可以看到OmniAnomaly在我们的框架下表现并不突出，可能是的因为原先的评价标准错误地表示了模型的能力。此外，我们还可以看到，表现的较好。
+
+在POT F1-Score上的表现，各个模型的结果如表所示，
+
+该部分结果与best 结果类似，best F1-Score比较好的，POT的方法的出来的指标也不会差。所以我们可以认为best F1-Score还是有一定的说服力；另一方面，大部分算法在使用POT之后效率下降地都比较明显，所以POT方法捕捉模型上限的能力还待商榷；最后，我们在测试时观察到POT的两个超参选取会较大地影响到模型的结果，所以POT的方法结果还是不够鲁棒。
+
+在时间效率上，各个算法的结果如下，，可以看出，综合效果和速率，如果投入使用的话，xx算法是个不错的选择。
+
 
 
