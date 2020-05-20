@@ -1,307 +1,139 @@
 % !TeX root = ../main.tex
 
-\chapter{基于深度学习的时间序列异常检测框架设计与实现}
+\chapter{基于时间序列异常检测的根因分析系统设计与实现}
 \label{cha:intro}
-本章主要介绍本文实现的基于深度学习的时间序列异常检测框架，对执行流程和各个部分的设计进行详细说明。
-\section{形式化定义}
-首先我们形式化地描述一下时间序列异常检测问题。一个时间序列是等时间间隔收集到的各个指标的值，定义为${\rm x}=\{{\rm x}_1,{\rm x}_2,\dots,{\rm x}_N\}$，$N$是收集的次数。由于本文考虑的是多元时间序列的异常检测，所以每个时间都会有多个监测指标的值，也就是其中${\rm x}_t\in R^M$，${\rm x}_t=[x_t^1,x_t^2,\dots,x_t^M]$，其中$t\leq N$，$M$是数据的维度。所以${\rm x}\in R^{N\times M}$。我们最终目标是输出一个$y=[y_1, y_2,\dots, y_N ]$，其中$y_t\in \{0,1\}$，$y_t=0$代表该时刻检测到的指标正常，否则认为发现一个异常。图\ref{fig:anomaly_example}展示了一个异常。
-\begin{figure}[htbp]
-  \centering
-  \includegraphics[width=\textwidth]{another_anomaly_example.png}
-  \caption{多维时间序列数据中的一个异常示例，其中标红部分为一个异常}
-  \label{fig:anomaly_example}
-\end{figure}
+\section{问题描述}
+在复杂系统中，无论是微服务还是云网络的场景，一方面，我们会得到单点的多个指标数据，也就是单个点上多条时间指标序列，而且由于可能是不同类型的点（例如微服务中的操作系统、数据库、容器、中间件以及云网络中的网关、交换机、虚拟机、物理机等），其指标也未必是同一个集合。另一方面，复杂系统中当出现异常时异常会在异常中蔓延，通常通过调用服务的方式来传播，本文中我们认为这种边是已知的。然后在具体的问题中，通常我们会有一个得知整个系统是否发生故障的入口，然后在这个时间点，有可能有多个点以及多条链路发生故障，我们需要快速定位到是哪个节点最初发生故障并通过各种方式传播到了整个系统导致系统整体运行出现问题。
 
-\section{框架设计}
-本文实现的基于深度学习的时间序列异常检测框架如图~\ref{fig:part1_overview}所示
+本文以2020AIops挑战赛《微服务应用系统故障发现和根因定位》进行复杂系统的根因分析系统设计与实现的工作。比赛中我们得到了所有节点包括操作系统、容器和数据库的单点信息，并且得到了不同节点之间调用服务的记录。其中包括所有节点及其静态拓扑图如图~\ref{fig:static_topo}所示。我们会得到若干个时间段，表示在这个时间段上整个系统出现了问题。问题分为网络故障和节点故障，节点故障需要我们给出某个节点的某个指标，而网络故障如果在操作系统上需要给出指标，否则只需要定位到节点即可。
 
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{part1_overview.png}
-    \caption{基于深度学习的时间序列异常检测框架}
-    \label{fig:part1_overview}
+    \includegraphics[width=\textwidth]{static-topo.pdf}
+    \caption{静态拓扑图}
+    \label{fig:static_topo}
   \end{figure}
 
-我们的框架分为训练和测试两种运行模式。
-
-在训练模式中，我们需要先用正常数据结合某个特定的模型训练出一个适用于该数据集的模型。然后在测试模式中时，模型对于每条数据会输出一个异常分数表示它的异常程度，通常情况下我们还需要模型来提供一个阈值，当异常程度>给定阈值时，认为该条数据是异常，否则认为正常，然后送到评估模块进行评估结果，或者我们枚举所有可能的阈值对结果进行评估，这样可以衡量模型的上限。
-
-接下来分别对系统的几个关键部分进行阐述。
-
-\section{数据集选择}
-我们选择了在SMD（Server Machine Dataset）\cite{su2019robust}数据集上完成实验。其是从国内某互联网公司的服务器上采集的长达5周的kpi真实指标进行脱敏处理后的结果。其测量了28台机器上的38个指标长达5周的结果，也就是$M=38$，然后将数据平均分为了两部分，一部分全是正常数据不包含异常${\rm x}_{train}$，而另一部分则包含异常${\rm x}_test$并且提供了标记$y_{test}$用来测试。考虑到该数据格式符合我们云网络的场景，所以选择了该数据集。
-
-\section{算法选择模块}
-在算法的选择方面，本文实现了两部分的算法，一部分是复现一些经典的算法，另一部分则是对已有算法进行一些修改来适应于当前的问题。
-\subsection{复现算法}
-本文复现了一些经典的异常检测算法，主要包含两类，一类是用于单点异常检测的算法，即将每个时间点的数据当成独立不相关的数据进行检测，也就是将这些模型看做一个函数的话，就是$y_t = \phi ({\rm x}_t)$，例如AutoEncoder、Variational AutoEncoder\cite{an2015variational}、Deep SVDD\cite{ruff2018deep}、DAGMM\cite{zong2018deep}、ConAD\cite{nguyen2018anomaly}；另一类则是判断每一时刻的状态时不仅要看当前的指标监测值，还要看之前一段时间数据，不妨令这段时间长度为$T$，则$y_t = \phi({\rm x}_{t-T},{\rm x}_{t-T+1},\dots,{\rm x}_{t})$，具体LSTM、LSTM-ED\cite{malhotra2016lstm}。
-\subsection{改进算法}
-在已有算法的基础上，我们做出了两方面的改进。
-
-一方面是修改已有的用于单点异常检测的算法结构来使其适应时间序列异常检测，主要方法是将原算法中的Linear层替换成LSTM层来保留和捕捉历史信息，比方说对AutoEncoder的模型改变如图~\ref{fig:lstm_ae}所示。依据此种方法，我们对VAE、DAGMM、ConAD进行修改分别得到了LSTM-VAE、LSTM-DAGMM和LSTM-ConAD模型。
-s
+\section{框架设计}
+本文设计的根因分析框架如图~\ref{fig:part2-overview}所示：
 \begin{figure}[htbp]
-  \begin{minipage}[t]{0.5\linewidth}
-  \centering
-  \includegraphics[width=\textwidth]{AE.png}
-  \caption*{原先的AutoEncoder模型}
-  \end{minipage}
-  \begin{minipage}[t]{0.5\linewidth}
-  \centering
-  \includegraphics[width=0.95\textwidth]{LSTM_AE.png}
-  \caption*{经过修改后的LSTM\_AE模型}
-  \end{minipage}
-  \caption{对AutoEncoder的模型修改过程}
-  \label{fig:lstm_ae}
-\end{figure}
+    \centering
+    \includegraphics[width=\textwidth]{part2-overview.png}
+    \caption{基于时间序列异常检测的根因分析系统框架}
+    \label{fig:part2-overview}
+  \end{figure}
 
-另一方面是我们将LSTM的预测与AE的重构结合起来，提出了一个AE\_Predictor模型，其结构如图~\ref{fig:AE_Predictor}所示。
+首先我们通过预处理可以得到一系列节点上的KPI和节点之间调用服务的相关指标（例如调用次数、延迟等），通过对这些KPI运行异常检测算法我们得到这些曲线的异常分数，并将其画到图上，当一个点的指标表现越异常，，它的节点半径越大，同时如果一条边越异常，那么这条边就越粗。然后我们通过在边上添加一些边或者修改一些边的权重得到一张随机游走图。最后在图上运行一个随机游走算法来得到最有可能是根因的节点结果，然后再进一步定位到节点的指标。接下来详细介绍各部分实现的细节。
+\section{异常检测模块}
+在异常检测模块，我们期望在每个故障的时刻给出每条时间序列数据的异常程度，然后再用某个聚合函数（例如max）将多条时间序列数据的分数变成单点/边的异常分数。由于单一时间序列数据得到的采样点最多只有300余个，无法使用基于深度学习的算法。因此我们需要用一些比较传统的方法，本文中我们选择了KDE算法，因为其计算简单、通用性强，适用于各种特性的KPI。但因为数据中存在明显的突刺（可能是统计错误）和周期性问题会影响到KDE算法的正确性，因此我们先将明显的突刺去掉，以及减去周期性的数据。其次，不同的时间序列数据可能具有不同的量纲和数量级。当各个数据之间差异很大的时候，直接用原数据做异常检测进行分析的话，就会突出数值较高的指标在综合分析中的作用，而削弱数值低的指标的作用。为了将所有时间序列数据的异常分数放在一起比较的结果具有可靠性，我们需要先将所有数据做归一化、总结如下：第一步做归一化，第二步去掉尖刺数据，第三步进行周期性检测，将周期性数据从原数据中减掉，最后一步进行KDE异常检测。
+\subsection{归一化}
+目前常用的数据归一化方法主要是min-max和z-score标准化，考虑到min-max受异常值影响较大，我们采用了z-score标准化的方法。设原始数据的值为$x_i$，$mean$为原始数据的平均值，$std$为原始数据的标准差，则：
+\begin{equation}
+y_i = \frac{x_i-mean}{std}
+\end{equation}
+
+$y_i$为归一化后的数据，均值为0，方差为1，而且没有量纲。
+\subsection{去除尖刺}
+去除尖刺的目的是为了消除统计错误，也就是数据中明显不符合正常数据的凸起。但我们不能采用将边缘的极值去掉的方法，因为我们想要检测的异常可能就是处于边缘的极值，但是这种异常和统计错误的区别就是持续时间会相对久一些（例如5分钟以上），我们针对做以下平滑的方式：
+\begin{equation}
+z_i = \begin{cases} \frac{y_{i-1} + y_{i+1}}{2}, & (y_i - y_{i-1} > th \& y_i - y_{i+1} > th) | (y_{i-1} - y_i > th \& y_{i+1} - y_i > th) \cr y_i, & otherwise  \end{cases}
+\end{equation}
+
+$z_i$则为去除尖刺后的数据。
+图~\ref{fig:smooth}展示了一个去除突刺的示例。其中红色标红的是出现故障的区间，如果不去除这些尖刺可能会导致在计算KDE时将尖刺统计在内而出现问题，0:45左右是真正出现故障的时间，而其他时间的波动都是正常波动，而去除尖刺之后我们很好地保留了真正的故障时段的异常，而去除了其他时刻的尖刺，保证其他时刻不会被误报。
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{AE_Predictor.png}
-  \caption{AE\_Predictor模型示意图}
-  \label{fig:AE_Predictor}
+  \includegraphics[width=\textwidth]{smooth.png}
+  \caption{去除尖刺示例}
+  \label{fig:smooth}
 \end{figure}
+\subsection{周期性数据去除}
 
-目的是要让AE学习的低维表示不仅具有重构当前数据的能力，同时低维表示序列还具有能够预测下一时刻数据的能力，也就是捕捉到时序依赖，以此达到更好的异常检测效果。
-
-\section{动态阈值选取模块}
-因为我们在算法选择部分均是实现的无监督的算法，因此通常算法输出的是一个异常分数的非负实数值，而不是一个0或者1的确切值，也就是说我们得到的实际是$s = [s_1, s_2,\dots,s_N]$，其中$s_t\in R^+$，$t\leq N$，要想进一步得到$y$，我们需要一个模型提供的或者人为提供的阈值threshold来作进一步的变换：
+在实际KPI中我们经常会遇到如~\ref{fig:period:left}所示的数据，具有很强的周期性，
+这样的数据完全是符合历史特征的，所以不应该被判断为异常。但如果我们用KDE算法的话，一个前提是当前数据只和周围数据相关，不会考虑到很久以前的数据，所以我们需要把周期性先给去掉。那么首先我们就要知道序列的周期是多长，这里我们用了自相关函数的方法，计算方法为：
 \begin{equation}
-  y_t = \begin{cases}
-    0, & s_t < threshold \cr
-    1, & s_t \geq threshold
-  \end{cases}
-\end{equation}
-通常情况下，该阈值的确立有多种方法，一种是假设异常分数满足特定分布，最常见的是高斯分布，但实际的异常分数很难从理论上证明符合高斯分布，通常情况下也确实不符合；一种是假设异常是异常分数最高的那一批，通过人为设定一个分位数，但这个分位数也可能不符合实际分布情况，而且，这两种方法都需要我们事先遍历整个测试集的情况下才能确立阈值，也就是我们要知道一条曲线的全貌之后才能确立它在之前的某个时刻是否异常，这在投入使用的时候是致命的，意味着异常检测极大的延迟，同时无法支持在线；还有一种方法是将测试集划分为验证集和测试集（因为测试集是有标的，验证集也是有标的，所以只能从原来的测试集中划分出验证集），通过在验证集上选取合适的阈值以及基于验证集和测试集情况类似的假设来期待在测试集上获得较好的效果。
-
-受到\cite{siffer2017anomaly}的启发，我们使用了基于极值理论的方法来自动确立动态的阈值。
-
-极值理论的好处是不会对数据的分布作任何假设，而Peak-Over-Threshold（POT）是极值理论的第二定理。POT的基本思想就是通过带有参数的广义Pareto分布（GPD）来拟合概率分布的尾部。我们的GPD函数如下：
-\begin{equation}
-  F(s) = P(th - S > s | S < th) \approx (1 + \frac{\gamma s}{\beta})^{-\frac{1}{\gamma}}
-\end{equation}
-其中$th$是异常分数的初始阈值，$\gamma$和$\beta$是GPD的形状和比例参数，S是{S1，S2，...，SN'}中的任何值。 低于阈值$th$的部分表示为$th-S$，并根据经验将其设置为低分位数。 与[22]类似，我们用最大似然估计的参数γˆ和β的最大值
-（MLE）。 然后通过以下公式计算最终阈值thF：
-\begin{equation}
-  th_F \approx th - \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N'_{th}})^{-\hat{\gamma}}-1)
-\end{equation}
-其中q是观察S <th的期望概率，N次观察，N'是Si s.t的数目。 Si <th
-日
-对于POT方法，仅需要调整两个参数（低分位数和q）。 这两个参数在整个模型范围内，可以凭经验进行设置：低分位数（例如，小于7％）和q（例如10-4）\cite{siffer2017anomaly}。
-
-当然，为了进一步衡量模型的上限，我们同样也会枚举所有可能的阈值，送到评估模块中获得结果最好的，作为模型上限的一个衡量标准。
-
-\section{评价模块}
-在异常检测领域，用的最多的评价指标是F\_1-Score，计算方式为
-\begin{equation}
-  Precision = \frac{TP}{TP + NP}
+  acf_i = \sum_{j=1}^{N-i}z_j\times z_{j+i}
 \end{equation}
 
+$acf$函数如图~\ref{fig:period:middle}所示，然后我们从画出的自相关函数图中就可以确立出函数的最小正周期是120，然后我们再统计出周期内每个位置的平均数据，并且用原数据的每个位置减去他们在周期中所处位置平均值得到处理好的数据如图~\ref{fig:period:right}所示，可以看到大部分尖刺都被去掉，也不会出现预期之外的异常。
+\begin{figure}[htbp]
+    \begin{minipage}[t]{0.33\linewidth}
+    \centering
+    \includegraphics[width=\textwidth]{period_left.png}
+    \caption*{(a)原始数据}
+    \label{fig:period:left}
+    \end{minipage}
+    \begin{minipage}[t]{0.33\linewidth}
+    \centering
+    \includegraphics[width=\textwidth]{period_middle.png}
+    \caption*{(b)自相关函数}
+    \label{fig:period:middle}
+    \end{minipage}
+    \begin{minipage}[t]{0.33\linewidth}
+      \centering
+      \includegraphics[width=\textwidth]{period_right.png}
+      \caption*{(c)去除周期后的数据}
+      \label{fig:period:right}
+      \end{minipage}
+    \caption{对数据去除周期化的过程}
+\end{figure}
+\subsection{KDE异常检测}
+KDE是概率论中用来估计未知函数密度的非参数检验的方法之一，可以根据观察到的样本来估计随机变量的概率密度函数。
 \begin{equation}
-  Recall = \frac{TP}{TP + FN}
+\hat{f}(x) = \frac{1}{n}\sum_{i=1}^nK(x;x_i)
 \end{equation}
+$K$是核函数，有多种选择，本文中我们采用了高斯核函数，$n$则是采样个数。KDE的核心思想就是对每个采样点形成一个一定带宽的核函数然后将所有采样点的核函数叠加起来即可，本文采取的带宽为0.4。当有了随机变量的密度函数之后，我们就可以用来计算新出现的数据概率了。本文中我们发现故障的持续时间总是5分钟，当给出故障时间点时，我们用前15分钟的数据来估计出一个密度函数，然后再来评估故障发生之后5分钟内数据出现的概率，概率越低说明这段时间的数据越异常，那么异常分数就越高。
+\section{根因分析模块}
+在异常检测模块，我们得到了每条曲线在该时刻的异常分数，对于一个点来说，我们认为他的异常分数就是所有曲线的异常分数的最大值，对于一条边来说，我们认为他的异常分数是所有边上的曲线分数的异常分数的平均值。因为单条边的分数具有偶然性。因此我们可以得到了如图~\ref{fig:error:example}所示的故障示例，其中点的大小代表点的异常分数的大小，而边的粗细代表边的异常程度的大小。
+\begin{figure}[htbp]
+  \centering
+  \begin{subfigure}[b]{\textwidth}
+    \begin{minipage}[t]{0.5\linewidth}
+      \centering
+      \includegraphics[width=\textwidth]{db_error.png}
+      \caption{db故障}
+      \label{fig:error:db}
+    \end{minipage}
+    \begin{minipage}[t]{0.5\linewidth}
+      \centering
+      \includegraphics[width=\textwidth]{os_error.png}
+      \caption{os故障}
+      \label{fig:error:os}
+    \end{minipage}
+  \end{subfigure}
 
-\begin{equation}
-  F_1-Score = 2\times \frac { Precision \times Recall}{Precision + Recall}
-\end{equation}
-其中$TP、TN、FP、FN$分别代表true positives、true negatives、false positives、false negatives。$Precision$描绘的是实际异常占检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，单用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。我们使用的评价体系应该尽可能贴近实际投入使用的体验。对于一段真正的异常而言，不仅要考虑检测为异常的点的个数、还要考虑检测出来的位置。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种point-wise的方法来对算法得到的结果进行调整然后再进行评估，具体就是对于一个真实的异常而言，如果我们的算法主要检测到了范围内的一个，那么整段异常就认为都被检测到。该评价方法没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
+  \begin{subfigure}[b]{\textwidth}
+    \begin{minipage}[t]{0.5\linewidth}
+      \centering
+      \includegraphics[width=\textwidth]{docker_cpu_error.png}
+      \caption{docker cpu故障}
+      \label{fig:error:db}
+    \end{minipage}
+    \begin{minipage}[t]{0.5\linewidth}
+      \centering
+      \includegraphics[width=\textwidth]{docker_network_error.png}
+      \caption{docker 网络故障}
+      \label{fig:error:os}
+    \end{minipage}
+  \end{subfigure}
+  \caption{AIOPS2020挑战赛中故障示例}
+  \label{fig:error:example}
+\end{figure}
+\subsection{构建随机游走图}
+我们要在原先的异常图的基础上构建随机游走图。不妨认为节点为1到N，然后node\_score[i]表示i的异常分数，而edge\_score[i,j]表示(i,j)边的异常分数。不同于之前的工作，我们直接将服务调用时间的异常分数作为边的权值，因此我们需要以下三种边：
+\begin{itemize}
+  \item 前向边：为了运行随机游走算法，边的方向应当代表异常传播的方向。当一个$i$调用$j$的服务调用时长发生异常时，我们认为异常是由$j$传播到$i$，因此异常传播的方向与服务调用的方向相反，也就是根因的方向与服务调用的方向相同。也就是$Q_{i,j} = edge\_weight_{i,j}$，如果$e_{i,j}\in E$；
+  \item 反向边：因为随机游走具有一定的随机性，为了防止行走者走到一个较小概率是根因的节点，然后出不去，我们考虑加入反向边。该边的权值随正向边的权值增加而增加，也就是$Q_{i,j} = \rho edge\_weight_{j,i}$，如果$e_{i,j} \notin E \& e_{j,i} \in E$；
+  \item 自环：当节点自身就是根因的时候，我们需要增大其留在原位置的概率而不走到其他地方。我们需要考虑三个因素，一是节点本身的异常分数，二是所有其他节点到该节点的边的异常分数的平均值，三是该节点到所有其他节点的边的异常分数的平均值，是因为我们观察到，当一个节点是根因时，它会影响到周围和它有关联的点，通常情况下所有调用它的服务的返回时间的都会出现异常，同时它调用其他节点的服务也会出现异常，因此我们要将这些因素也纳入考量范围，也就是$Q_{i,i} = w_{in} \times in\_avg\_weight_{i} + w_{out} \times out\_avg\_weight_{j}+ w_{self} \times node\_weight_i$。另一方面，考虑到入边是推到根因的地方，所以我们在设置时会保证$w_{in}>w_{out}$。
+\end{itemize}
 
-基于以上考虑，我们借用了\cite{tatbul2018precision}的新型的Precision和Recall的计算方式。
-
-首先我们将异常表示成区间的集合，真实的异常为$R=[R_1,R_2,\dots,R_{N_r}]$，其中每个$R_i$代表一个区间的异常，我们不放人为$R_i.l$和$R_i.r$分别代表该区间的左右端点。同理$P=[P_1,P_2,\dots,P_{N_p}]$表示预测出来的异常。
-\begin{equation}
-  Recall(R,P) = \frac{\sum_{i=1}^{N_r} Recall_T(R_i,P)}{N_r}
-\end{equation}
-其中$Recall_T$的计算由两部分加权组成：分别考虑了存在性以及位置性。
-\begin{equation}
-  Recall_T(R_i,P) = \alpha \times ExistenceReward(R_i,P) + (1-\alpha) \times OverlapReward (R_i,P)
-\end{equation}
-存在性只需要判断是否存在一个检测出的异常区间当前的实际异常有交集。
-\begin{equation}
-ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0, & otherwise \end{cases}
-\end{equation}
-而相交性则需要考虑重叠的位置和大小的关系，此处我们认为对于一个异常来说，越开始检测到对我们来说越重要，因此我们将靠前的位置分配较大的权重，具体计算如图~\ref{algorithm:omega1}所示。
-\begin{equation}
-  OverlapReward(R_i,P) = \sum_{j=1}^{N_p}\omega(R_i,R_i\cap P_j)
-\end{equation}
-\begin{algorithm}
-  \caption{$\omega$ 计算方法1}
-  \begin{algorithmic}
-      \Function{$\omega$}{AnomalyRange, OverlapRange}
-      \State DetectValue \gets 0
-      \State TotalValue \gets 0
-      \State len \gets length(AnomalyRange)
-      \For {i = 1  \to len}
-          \State Value \gets len - i + 1
-          \State TotalValue \gets TotalValue + Value
-          \If {AnomalyRange[i] in OverlapRange}
-              \State DetectValue \gets DetectValue + Value
-          \EndIf
-      \EndFor
-      \State \Return $\frac{DetectValue}{TotalValue}$
-      \EndFunction
-  \end{algorithmic}
-  \label{algorithm:omega1}
-\end{algorithm}
-意识到OverlapRange也一定是一个区间之后，我们可以将$\omega$的计算方式简化为如下：
-  \begin{algorithm}
-    \caption{$\omega$ 计算方法2}
-    \begin{algorithmic}
-        \Function{$\omega$}{AnomalyRange, OverlapRange}
-        \State len \gets length(AnomalyRange)
-        \State TotalValue \gets $\frac{len \times (len + 1)}{2}$
-        \State l \gets OverlapRange.l - AnomalyRange.l + 1
-        \State r \gets OverlapRange.r - AnomalyRange.l + 1
-        \State DetectValue \gets $\frac{r \times (r+1)}{2} - \frac{(l-1) \times l}{2}$
-        \State \Return $\frac{DetectValue}{TotalValue}$
-        \EndFunction
-    \end{algorithmic}
-    \label{algorithm:omega2}
-  \end{algorithm}
-
-新型Precision的计算方式类似：
-
-\begin{equation}
-Precision(R,P) = \frac{\sum_{i=1}^{N_p}Precision_T(R,P_i)}{N_p}
-\end{equation}
-
-区别是$Precision_t(R,P_i)$的计算不需要考虑$ExistenceReward$，直接按照检测到的位置算贡献即可:
-\begin{equation}
-Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
-\end{equation}
-
-
-  该评价方式虽然考虑的全面，但是随之而来的就是计算代价很大，复杂度为$O(N_r\times N_p)$。当我们需要计算所有阈值的结果并选取最好的时候，考虑阈值按从大到小枚举所有可能的$N$个，最坏情况下的$N_p$序列为$\{1,2,3,\dots,\frac{N}{2},\frac{N}{2}-1,\frac{N}{2}-2,\dots,1\}$，则总的计算复杂度为$O(N_r\times N^2)$。
-
-  \begin{algorithm}
-  \caption{朴素的Best F1-Score计算方式}
-  \begin{algorithmic}[1]
-    \Require TAT
-    \Ensure 最好的F1-Score
-    \Function {computeBestF1Score}{R,S}
-    \State bestF1Score = 0
-    \ForAll {$s \in S$}
-    \State P \gets translateTo01(S,s)
-    \State bestF1Score \gets max(bestF1Score, computeF1Score(R,P))
-    \EndFor
-    \State \Return bestF1Score
-    \EndFunction
-  \end{algorithmic}
-  \end{algorithm}
-
-
-  我们考虑一种新的增量计算的方式，每次将阈值下调时，考虑只有一个位置$i$的预测结果从0变成了1，那么有可能有三种情况：
-  \begin{enumerate}
-    \item 这一个位置形成了一个新的异常区间，也就是$i-1$和$i+1$都是不存在或者为0的状态
-    \item 这个位置拓宽了相邻的区间，也就是$i-1$或者$i+1$中有且只有一个位置已经被预测为1
-    \item 这个位置将左右两个区间连成了一个区间，也就是$i-1$与$i+1$都存在且被预测为异常
-  \end{enumerate}
-
-  如果我们能够以一个较低的复杂度支持动态的在$P$中增加、减少一个异常区间同时计算Precision和Recall的值，那么就能高效的求解best F1-Score。具体来讲，我们通过记录中间变量的方式来记录计算过程中的中间状态，通过并查集的方式来快速维护$P$。具体的算法过程如下：
-
-  \begin{breakablealgorithm}
-    \caption{高效的Best F1-Score计算方式}
-    \begin{algorithmic}[1]
-      \Require TAT
-      \Ensure 最好的F1-Score
-      \State $rangeReward \gets [0] * N_r$
-      \State $rangeOverlapCount \gets [0] * N_r$
-      \State $Recall \gets 0$
-      \State $Precision \gets 0$
-
-      \State
-
-      \Function {computeBestF1Score}{R,S}
-      \State bestF1Score = 0
-      \State S \gets sorted(S) in descending order
-      \ForAll {$s \in S$}
-      \State i \gets indexOf(s)
-      \State predict[i] = 1
-      \If { $i + 1 < n and predict[i + 1] = 1$}
-          \State \Call{dropPredictRange}{getRange(i + 1)}
-          \State \Call{union}{i, i + 1}
-      \EndIf
-      \If {$i - 1 \geq 0 and predict[i - 1] = 1$}:
-          \State \Call{dropPredictRange}{(getRange(i - 1)}
-          \State \Call{union}{i, i - 1}
-      \EndIf
-      \Call{addPredictRange}{getRange(i)}
-      \State $bestF1Score \gets max(bestF1Score, 2\times\frac{Precision \times Recall}{Precision + Recall})$
-      \EndFor
-      \State \Return bestF1Score
-      \EndFunction
-      
-      \State
-
-      \Function {addPredictRange}{p}
-      \State Recall \gets 0
-      \ForAll $R_i \in R$
-            \State $rangeReward_i += \omega(R_i,R_i \cap p)$
-            \State $overlapCount_i += |R_i\cap p|$
-            \If {$overlapCount_i > 0$}
-              \State existReward = 1
-            \Else
-              \State existReward = 0
-            \EndIf
-            \State $overlapReward \gets rangeReward_i$
-            \State $Recall += \alpha \times existReward + (1-\alpha) \times overlapReward$
-      \EndFor
-      \State $Recall /= N_r$
-
-      \State
-
-      \State reward \gets 0
-      \ForAll $R_i \in R$
-            \State $reward += \omega(p, p \cap R_i)$
-      \EndFor
-      \State $Precision \gets \frac{Precision \times N_p + reward}{N_p + 1}$
-      \State $N_p += 1$
-      \EndFunction
-
-      \State
-
-      \Function {dropPredictRange}{p}
-      \State Recall \gets 0
-      \ForAll $R_i \in R$
-            \State $rangeReward_i -= \omega(R_i,R_i \cap p)$
-            \State $overlapCount_i -= |R_i\cap p|$
-            \If {$overlapCount_i > 0$}
-              \State existReward = 1
-            \Else
-              \State existReward = 0
-            \EndIf
-            \State $overlapReward \gets rangeReward_i$
-            \State $Recall += \alpha \times existReward + (1-\alpha) \times overlapReward$
-      \EndFor
-
-      \State
-
-      \State $Recall /= N_r$
-
-      \State reward \gets 0
-      \ForAll $R_i \in R$
-            \State $reward += \omega(p, p \cap R_i)$
-      \EndFor
-      \State $Precision \gets \frac{Precision \times N_p - reward}{N_p - 1}$
-      \State $N_p -= 1$
-      \EndFunction
-    \end{algorithmic}
-  \end{breakablealgorithm}
-  其中getRange和Union是通过并查集来实现记录和维护某个位置所属的区间以及该区间的左右端点，算法中不再赘述。容易得知这样的计算复杂度为$O(N_r\times N)$，较原先下降了一个数量级，实测原先需要4小时的计算仅需3秒就可以得出结果。
-\section{实验结果与分析}
-我们考虑实验结果主要从三方面来分析，一方面是各个模型在best F1-Score上的表现，也就是模型上限的衡量。再一方面，我们考虑各个模型在用POT确立阈值之后的表现，最后，我们还要关注各个模型的效率问题，尤其是测试阶段的效率，因为这影响到我们模型的上限。
-
-在best F1-Score上的表现，各个模型的结果如表所示，其中各个指标的计算方式是由28台机器的结果取平均得到。除了本文实现的模型外，我们还加入了当前state-of-the-art的工作OminiAnomaly\cite{su2019robust}的输出结果来评价，方便做对比。
-
-我们可以看到OmniAnomaly在我们的框架下表现并不突出，可能是的因为原先的评价标准错误地表示了模型的能力。此外，我们还可以看到，表现的较好。
-
-在POT F1-Score上的表现，各个模型的结果如表所示，
-
-该部分结果与best 结果类似，best F1-Score比较好的，POT的方法的出来的指标也不会差。所以我们可以认为best F1-Score还是有一定的说服力；另一方面，大部分算法在使用POT之后效率下降地都比较明显，所以POT方法捕捉模型上限的能力还待商榷；最后，我们在测试时观察到POT的两个超参选取会较大地影响到模型的结果，所以POT的方法结果还是不够鲁棒。
-
-在时间效率上，各个算法的结果如下，，可以看出，综合效果和速率，如果投入使用的话，xx算法是个不错的选择。
+\subsection{随机游走}
+由于$os_{021}$和$os_{022}$是整张拓扑图的入口，因此我们以这两个点为起点，随机游走1000次，统计每个节点被经过的次数。进一步的，为了避免行者到某个不是根因的节点出不去，我们将这个过程重复10遍，消除其中的随机性带来可能的答案错误。最后按到达次数对节点进行排序。最后我们选取到达次数最多的节点，输出其节点上异常分数最高的kpi作为最终的根因。此处有一个特判，是当该节点本身的异常分数比较小，且没有向下传播异常的时候，我们认为是该节点的网络故障而不是cpu故障。
 
 
 
+\section{结果}
+目前，本文提出的算法在该竞赛目前已公布的三阶段数据中可以获得100\%的正确率。
+
+\section{小结}
