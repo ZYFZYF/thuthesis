@@ -1,23 +1,22 @@
 % !TeX root = ../main.tex
 
-% 中英文摘要和关键字
+\begin{survey}
+\label{cha:survey}
 
-\begin{abstract}
-  近些年来越来越多的企业和个人选择将自己的服务部署在云网络中，云网络的规模随之扩大，而且伴随而来的还有经常发生的大规模故障。当这些故障在复杂咋云网络场景中发生时，及时地检测和定位就成了一个难题。
+\title{Research report}
+\maketitle
 
-  本文以云网络为背景抽象出了两个问题进行研究，所提出的两个系统结合起来理论上可以在云网络中进行高效而准确的异常检测和根因定位。其一是用深度学习的方法对多元时间序列数据进行异常检测的框架，可以部署在云网络中的单点上，对每个时刻的多条指标检测曲线进行异常的发现，本文实现了多种算法并在ServerMachineDataset\cite{su2019robust}数据集上进行了测试和比较；其二是在复杂系统上的根因分析系统，可以部署在某一个闭环系统上，结合单点的异常情况和节点之间的拓扑关系找出异常发生的根本源头，本文提出的方法基于异常检测和随机游走，目前在AIOPS2020挑战赛的前两阶段中可以获得100\%的正确率。
+My investigation is mainly divided into three progressive parts, the first part is a single time series data anomaly detection algorithm, the second part is a multi-dimensional time series data anomaly detection algorithm, and the last part is the root cause analysis of multi-point anomalies. Due to the particularity of the anomaly detection problem: it is difficult to define anomalies and it is difficult to obtain labeled data, so most of the survey methods are conducted in an unsupervised, zero-positive background.
 
-  % 关键词用“英文逗号”分隔
-  \thusetup{
-    keywords = {云网络,异常检测,根因分析,随机游走,深度学习},
-  }
-\end{abstract}
+Single time series data anomaly detection algorithm: \cite{malhotra2015long} is the first time to apply long short term memory networks to time series data anomaly detection. Previous work was performed in sliding windows, and the information obtained was limited, and the emergence of LSTM solved long-range dependence in this problem. \cite{DBLP:conf/kdd/RenXWYHKXYTZ19} linked the saliency detection of the visual direction with the abnormal detection of the time series data, thinking that the anomalies of the time series data also have similar saliency, so borrowed the most advanced models in saliency detection which are unsupervised spectral residual and supervised convolutional neural network. They use the output of the former as the input of the latter to form an SR-CNN model, which has achieved great performance and implemented a complete online / real-time time series data anomaly detection platform.
 
-\begin{abstract*}
-  In recent years, more and more enterprises and individuals have chosen to deploy their services in the cloud network, and the scale of the cloud network has expanded accordingly, and it is accompanied by frequent large-scale failures. When these faults occur in a complex cloud network scenario, timely detection and location becomes a problem.
+Multi-dimensional time series data anomaly detection algorithm: \cite{DBLP:journals/tdsc/WatsonSMMH16} use one class support vector machine to perform manual anomaly detection on system-level and network-level features, which ensured high efficiency while responding to anomalies never seen before. In \cite{DBLP:conf/ndss/MirskyDES18} a method using multi-layer AutoEncoder for feature reconstruction named Kitsune is proposed to perform multi-dimensional time series correlation data anomaly detection for network intrusion detection, in which a large number of original features and two-dimensional features are extracted, and the the feature incremental calculation method has greatly improved the efficiency of the algorithm so that it can support online intrusion detection. In \cite{DBLP:conf/aaai/ZhangSCFLCNZCC19}, a multi-dimensional time series correlation matrix is constructed to transform it into a two-dimensional matrix input, and then a complex fully convolutional networks is used to perform two-dimensional reconstruction. Although the model is more complex, the effect is relatively intuitive and interpretable. First, we can easily determine whether anomalies have occurred by determining the reconstruction loss threshold, and the root cause of the anomalies can be located by observing the distribution of the loss. However, this method of forcibly converting one-dimensional data to two-dimensional data may be inadequate. It also does not have spatially very strong spatially dependent information like images. Making improvements in this area like putting correlative data together may further improve the effect of the model.
 
-  In this paper, two problems are abstracted and studied based on the cloud network. The two systems proposed can theoretically perform efficient and accurate anomaly detection and root cause location in the cloud network. One is a framework for anomaly detection of multivariate time series data using deep learning methods, which can be deployed at a single point in the cloud network to discover anomalies for multiple index detection curves at each moment. The algorithm is tested and compared on the ServerMachineDataset dataset; the second is the root cause analysis system on complex systems, which can be deployed on a closed-loop system, combining single-point anomalies and the topological relationship between nodes to find the root cause of anomalies. The method proposed in this paper is based on anomaly detection and random walk. At present, 100\% accuracy rate can be obtained in the first two stages of the AIOPS2020 challenge.
-  \thusetup{
-    keywords* = {cloud network,anomaly detection, root cause analysis, random walk, deep learning},
-  }
-\end{abstract*}
+The root cause analysis of multi-point anomalies occurs simultaneously. \cite{DBLP:conf/iwqos/SuZXLBZCLNZWP19} proposed the concept of flux-correlation by predicting time series data. Through the calculation of correlation, it is possible to determine whether the flux are correlated, the direction of correlation and the sequence. When it appears, it can quickly locate the source of anomalies based on the path of flux propagation. By clustering based on flux-correlation scores, it can also achieve the purpose of compressing alarms and speeding up troubleshooting. In \cite{lin2016automated} a complete anomaly detection and root cause analysis system was proposed for cloud network. K-Means was used to perform unsupervised anomaly detection. In the root cause analysis part, a concept of anomalous propagation diagram was proposed. The propagation path is divided into horizontal propagation (virtual machine to physical machine, physical machine to virtual machine) and vertical propagation (call between virtual machines) to construct the anomaly propagation path.Then calculate the distance from each anomaly source to all anomalous points and use it as a basis for judging that point as the root cause (the smaller the more likely it is the root cause). However, it does not distinguish the types of edges, and there is no edge weights. \cite{weng2018root} On the basis of \cite{lin2016automated}, it focused on the analysis of the root cause of exceptions caused by multi-level service calls on the public cloud. Unlike the previous article, this article divides edges into configuration dependencies and service call dependencies. and concentrated more on the service response time. It also distinguishes the edge weights of anomalous propagation graphs, and introduces random walks and other strategies in the calculation to achieve more detailed and complex root cause analysis.
+
+At each stage, there are multiple algorithms to choose from. When specifically applied to the Alibaba cloud network scenario, the adaptability of the problem needs to be considered. If necessary, certain improvements and innovations to the original algorithm need to be proposed in order to solve the problem well.
+
+\bibliographystyle{plainnat}
+\bibliography{ref/refs,ref/appendix}
+
+\end{survey}
