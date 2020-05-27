@@ -4,11 +4,11 @@
 \label{cha:intro}
 本章主要介绍本文实现的基于深度学习的时间序列异常检测框架，对执行流程和各个部分的设计进行详细说明。
 \section{形式化定义}
-首先我们形式化地描述一下时间序列异常检测问题。一个时间序列是等时间间隔收集到的各个指标的值，定义为$x=\{x_1,x_2,\dots,x_N\}$，$N$是采集的次数。由于本文考虑的是多元时间序列的异常检测，所以每个时间都会有多个监测指标的值，也就是其中$x_t\in R^M$，$x_t=[x_t^1,x_t^2,\dots,x_t^M]$，其中$t\leq N$，$M$是数据的维度。所以$x\in R^{N\times M}$。我们最终目标是输出一个$y=[y_1, y_2,\dots, y_N ]$，其中$y_t\in \{0,1\}$，$y_t=0$代表该时刻检测到的指标正常，否则认为发现一个异常。图\ref{fig:anomaly_example}展示了一个异常示例。
+首先我们形式化地描述一下时间序列异常检测问题。一个时间序列是等时间间隔收集到的各个指标的值，定义为$x=\{x_1,x_2,\dots,x_N\}$，$N$是采集的次数。由于本文考虑的是多元时间序列的异常检测，所以每个时间都会有多个监测指标的值，也就是其中$x_t\in R^M$，$x_t=[x_t^1,x_t^2,\dots,x_t^M]$，其中$t\leq N$，$M$是数据的维度。所以$x\in R^{N\times M}$。我们最终目标是输出一个$y=[y_1, y_2,\dots, y_N ]$，其中$y_t\in \{0,1\}$，$y_t=0$代表该时刻检测到的指标正常，否则认为发现一个异常。图\ref{fig:anomaly_example}展示了一个异常示例，其中标红部分为一个出现异常的事件段。
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{another_anomaly_example.png}
-  \caption{多维时间序列数据中的一个异常示例，其中标红部分为一个异常}
+  \caption{多维时间序列数据中的一个异常示例}
   \label{fig:anomaly_example}
 \end{figure}
 
@@ -22,12 +22,11 @@
     \label{fig:part1_overview}
   \end{figure}
 
-我们的框架分为训练和测试两种运行模式。
+本文涉及的框架分为训练和测试两个步骤。
 
-在训练模式中，我们需要先用正常数据结合某个特定的模型训练出一个适用于该数据集的模型。然后在测试时，模型对于每一时刻会输出一个异常分数通常为非负实数表示此时的异常程度，值越大表示越异常，但由于我们想得到的只有是否是异常，所以通常情况下我们还需要模型来提供一个阈值，当异常程度>给定阈值时，认为该条数据是异常，否则认为正常，然后将得到的预测结果送到评估模块与真实的异常标签进行结果的评估。由于阈值的确立有多种方法，每个算法适用的确立阈值的方法的也不尽相同，，因此我们同时枚举所有可能的阈值对结果进行评估，选取结果最好的来衡量模型的上限\cite{xu2018unsupervised,su2019robust,DBLP:conf/ipccc/LiCP18,DBLP:conf/infocom/ChenXLPCQFW19}，而且从实验结果来看这种方法下得到的指标与确立阈值之后指标有很强的相关性。
+在训练时，需要先用正常数据结合某个特定的模型训练出一个适用于该数据集的模型。然后在测试时，模型对于每一时刻会输出一个异常分数通常为非负实数表示此时的异常程度，值越大表示越异常，但由于最终输出的是一个是否是异常的01值，所以通常情况下还需要模型来提供一个阈值，当异常程度>给定阈值时，认为该条数据是异常，否则认为正常，然后将得到的预测结果送到评估模块与真实的异常标签进行结果的评估。由于阈值的确立有多种方法，每个算法适用的确立阈值的方法的也不尽相同，因此本文还同时枚举所有可能的阈值对结果进行评估，选取结果最好的来衡量模型的上限\cite{xu2018unsupervised,su2019robust,DBLP:conf/ipccc/LiCP18,DBLP:conf/infocom/ChenXLPCQFW19}。
 
-接下来分别对系统的几个关键部分进行阐述。
-
+接下来分别对框架的几个关键部分进行阐述
 \section{数据集选择}
 目前用来做多维时间序列数据异常检测的数据集如表~\ref{tab:dataset}所示：
 
@@ -87,24 +86,24 @@
 
 \section{动态阈值选取模块}
 因为我们在算法选择部分均是实现的无监督的算法，因此通常算法输出的是一个异常分数的非负实数值，而不是一个0或者1的确切值，也就是说我们得到的实际是$s = [s_1, s_2,\dots,s_N]$，其中$s_t\in R^+$，$t\leq N$，要想进一步得到$y$，我们需要一个模型提供的或者人为提供的阈值threshold来作进一步的变换：
-\begin{equation}
+\begin{equation*}
   y_t = \begin{cases}
     0, & s_t < threshold \cr
     1, & s_t \geq threshold
   \end{cases}
-\end{equation}
+\end{equation*}
 
 通常情况下，该阈值的确立有多种方法，一种是假设异常分数满足特定分布，例如高斯分布，求出正常数据下的异常分数的均值$\mu$和方差$\sigma$，那么异常分数超过$\mu + 3\sigma$的数据理论上不到0.3\%，那么我们就可以认为异常分数位于这个范围内数据是异常，但实际的异常分数很难从理论上证明符合高斯分布，通常情况下也确实不符合；还有一种比较简单的方式是假设异常是异常分数最高的那一批，通过人为设定一个分位数，例如5\%，那么在测试时就直接将最高的那5\%的数据标为异常，但这个分位数的选取也是个难题，毕竟异常的比例也不是事先就知道的，而且，还需要我们事先遍历整个测试集的情况下才能确立阈值，意味着我们只能做离线的异常检测；还有一种方法是通过在验证集上选取合适的阈值以及基于验证集和测试集情况类似的假设来期待在测试集上获得较好的效果，这种方法的缺点在于我们还需要另一份有标数据来进行阈值的确定，在真正落地的时候难度较大。
 
-受到\cite{siffer2017anomaly}的启发，我们使用了极值理论中的POT方法来确立异常分数的阈值，好处是无需对原分布做出任何假设，可以高效、准确、在线地确立阈值。其基本思想就是通过带有参数的GPD\footnote{Generalized Pareto Distribution，广义帕累托分布}来拟合概率分布的尾部：
-\begin{equation}
+受到\cite{siffer2017anomaly}的启发，我们使用了极值理论中的POT方法来确立异常分数的阈值，好处是无需对原分布做出任何假设，可以准确、在线地确立阈值。其基本思想就是通过带有参数的GPD\footnote{Generalized Pareto Distribution，广义帕累托分布}来拟合概率分布的尾部：
+\begin{equation*}
   \hat{F}_{th}(s) = P(S - th > s | S > th) \approx (1 + \frac{\gamma s}{\beta})^{-\frac{1}{\gamma}}
-\end{equation}
+\end{equation*}
 
 其中$th$是一个异常分数的初始阈值，用来确定尾部区域，可以凭经验地设为正常数据的异常分数的一个较大的分位数，$\gamma$和$\beta$是GPD的形状和比例参数，是两个未知参数，我们用最大似然估计的方法得到参数$\hat{\gamma}$和$\hat{\beta}$，然后通过以下公式计算最终阈值$th_F$：
-\begin{equation}
+\begin{equation*}
   th_F \approx th + \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N_{th}})^{-\hat{\gamma}}-1)
-\end{equation}
+\end{equation*}
 
 其中$q$是观察$S<th_F$的期望概率，也是POT算法的一个输入，可以凭经验确定，$N$是总的数据点个数，$N_{th}$是"尾部"的数据点的个数。
 
@@ -129,41 +128,41 @@
 
 \section{评价模块}
 在异常检测领域，用的最多的评价指标是F\_1-Score，计算方式为
-\begin{equation}
+\begin{equation*}
   Precision = \frac{TP}{TP + NP}
-\end{equation}
+\end{equation*}
 
-\begin{equation}
+\begin{equation*}
   Recall = \frac{TP}{TP + FN}
-\end{equation}
+\end{equation*}
 
-\begin{equation}
+\begin{equation*}
   F_1-Score = 2\times \frac { Precision \times Recall}{Precision + Recall}
-\end{equation}
+\end{equation*}
 
 其中$TP$、$TN$、$FP$、$FN$分别代表true positives、true negatives、false positives和 false negatives。$Precision$描绘的是实际异常占检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，单用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。对于一段真正的异常而言，检测到异常的点的个数以及检测出来的位置都反映了模型效果的不同，例如一段长度为10的异常，模型$A$检测到了其中的8个，而模型$B$只检测到了1个，那么相对而言前者的效果会更好；如果模型$A$在这段异常开始的第一个位置就检测到了异常，而模型$B$直到第5个点才检测到，那么在实际投入使用时，前者的效果一定是我们更想要，能够帮助工作人员更早地发现异常。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种point-wise的方法来对算法得到的结果进行调整然后再进行评估，具体就是对于一个真实的异常而言，如果我们的算法主要检测到了范围内的一个，那么整段异常就认为都被检测到。该评价方法就没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
 
 基于以上考虑，我们借用了\cite{tatbul2018precision}的新型的Precision和Recall的计算方式。
 
 首先我们将异常表示成区间的集合，真实的异常为$R=[R_1,R_2,\dots,R_{N_r}]$，其中每个$R_i$代表一个区间的异常，我们不放人为$R_i.l$和$R_i.r$分别代表该区间的左右端点。同理$P=[P_1,P_2,\dots,P_{N_p}]$表示预测出来的异常。
-\begin{equation}
+\begin{equation*}
   Recall(R,P) = \frac{\sum_{i=1}^{N_r} Recall_T(R_i,P)}{N_r}
-\end{equation}
+\end{equation*}
 
 其中$Recall_T$的计算由两部分加权组成：分别考虑了存在性以及位置性。
-\begin{equation}
+\begin{equation*}
   Recall_T(R_i,P) = \alpha \times ExistenceReward(R_i,P) + (1-\alpha) \times OverlapReward (R_i,P)
-\end{equation}
+\end{equation*}
 
 存在性只需要判断是否存在一个检测出的异常区间当前的实际异常有交集。
-\begin{equation}
+\begin{equation*}
 ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0, & otherwise \end{cases}
-\end{equation}
+\end{equation*}
 
 而相交性则需要考虑重叠的位置和大小的关系，此处我们认为对于一个异常来说，越开始检测到对我们来说越重要，因此我们将靠前的位置分配较大的权重，具体计算如图~\ref{algorithm:omega1}所示。
-\begin{equation}
+\begin{equation*}
   OverlapReward(R_i,P) = \sum_{j=1}^{N_p}\omega(R_i,R_i\cap P_j)
-\end{equation}
+\end{equation*}
 \begin{algorithm}
   \caption{$\omega$ 计算方法1}
   \begin{algorithmic}
@@ -202,14 +201,14 @@ ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0
 
 新型Precision的计算方式类似：
 
-\begin{equation}
+\begin{equation*}
 Precision(R,P) = \frac{\sum_{i=1}^{N_p}Precision_T(R,P_i)}{N_p}
-\end{equation}
+\end{equation*}
 
 区别是$Precision_t(R,P_i)$的计算不需要考虑$ExistenceReward$，直接按照检测到的位置算贡献即可:
-\begin{equation}
+\begin{equation*}
 Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
-\end{equation}
+\end{equation*}
 
   该评价方式虽然考虑的全面，但是随之而来的就是计算代价很大，复杂度为$O(N_r\times N_p)$。当我们需要计算所有阈值的结果并选取最好的时候，考虑阈值按从大到小枚举所有可能的$N$个，最坏情况下的$N_p$序列为$\{1,2,3,\dots,\frac{N}{2},\frac{N}{2}-1,\frac{N}{2}-2,\dots,1\}$，则总的计算复杂度为$O(N_r\times N^2)$。
 
@@ -425,7 +424,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
     \bottomrule
     \end{tabular}
     \caption{单点异常检测模型结合时序模型后模型效果的变化}
-    \label{tab:lstm-diff} 
+    \label{tab:lstm-diff}
 
 \end{table}
 
@@ -454,14 +453,14 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{predict_time_with_pot.png}
+  \includegraphics[width=\textwidth]{spot_time.png}
   \caption{POT方法评估时间}
   \label{fig:pot:time}
 \end{figure}
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{eval_time.png}
+  \includegraphics[width=\textwidth]{best_eval_time.png}
   \caption{枚举所有阈值评估时间}
   \label{fig:eval:time}
 \end{figure}
