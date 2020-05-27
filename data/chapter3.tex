@@ -85,7 +85,7 @@
 目的是要让AE学习的低维表示不仅具有重构当前数据的能力，同时低维表示序列还具有能够预测下一时刻数据的能力，也就是捕捉到时序依赖，以此达到更好的异常检测效果。
 
 \section{动态阈值选取模块}
-因为我们在算法选择部分均是实现的无监督的算法，因此通常算法输出的是一个异常分数的非负实数值，而不是一个0或者1的确切值，也就是说我们得到的实际是$s = [s_1, s_2,\dots,s_N]$，其中$s_t\in R^+$，$t\leq N$，要想进一步得到$y$，我们需要一个模型提供的或者人为提供的阈值threshold来作进一步的变换：
+因为在算法选择部分均是实现的无监督的算法，因此通常算法输出的是一个异常分数的非负实数值，而不是一个0或者1的确切值，也就是说得到的实际是$s = [s_1, s_2,\dots,s_N]$，其中$s_t\in R^+$，$t\leq N$，要想进一步得到$y$，需要一个模型提供的或者人为提供的阈值$threshold$来作进一步的变换：
 \begin{equation*}
   y_t = \begin{cases}
     0, & s_t < threshold \cr
@@ -93,14 +93,14 @@
   \end{cases}
 \end{equation*}
 
-通常情况下，该阈值的确立有多种方法，一种是假设异常分数满足特定分布，例如高斯分布，求出正常数据下的异常分数的均值$\mu$和方差$\sigma$，那么异常分数超过$\mu + 3\sigma$的数据理论上不到0.3\%，那么我们就可以认为异常分数位于这个范围内数据是异常，但实际的异常分数很难从理论上证明符合高斯分布，通常情况下也确实不符合；还有一种比较简单的方式是假设异常是异常分数最高的那一批，通过人为设定一个分位数，例如5\%，那么在测试时就直接将最高的那5\%的数据标为异常，但这个分位数的选取也是个难题，毕竟异常的比例也不是事先就知道的，而且，还需要我们事先遍历整个测试集的情况下才能确立阈值，意味着我们只能做离线的异常检测；还有一种方法是通过在验证集上选取合适的阈值以及基于验证集和测试集情况类似的假设来期待在测试集上获得较好的效果，这种方法的缺点在于我们还需要另一份有标数据来进行阈值的确定，在真正落地的时候难度较大。
+通常情况下，该阈值的确立有多种方法，一种是假设异常分数满足特定分布，例如高斯分布，求出正常数据下的异常分数的均值$\mu$和方差$\sigma$，那么异常分数超过$\mu + 3\sigma$的数据理论上不到0.3\%，那么我们就可以认为异常分数位于这个范围内数据是异常，但实际的异常分数很难从理论上证明符合高斯分布，通常情况下也确实不符合；还有一种比较简单的方式是假设异常是异常分数最高的那一批，通过人为设定一个分位数，例如5\%，那么在测试时就直接将最高的那5\%的数据标为异常，但这个分位数的选取也是个难题，异常的比例事先并不知道，而且，该方法需要知道整个测试集的情况才能确立阈值，意味着只能做离线的异常检测；还有一种方法是通过在验证集上选取合适的阈值以及基于验证集和测试集情况类似的假设来期待在测试集上获得较好的效果，这种方法的缺点在于我们还需要另一份有标数据来进行阈值的确定，在真正落地的时候难度较大。
 
 受到\cite{siffer2017anomaly}的启发，我们使用了极值理论中的POT方法来确立异常分数的阈值，好处是无需对原分布做出任何假设，可以准确、在线地确立阈值。其基本思想就是通过带有参数的GPD\footnote{Generalized Pareto Distribution，广义帕累托分布}来拟合概率分布的尾部：
 \begin{equation*}
   \hat{F}_{th}(s) = P(S - th > s | S > th) \approx (1 + \frac{\gamma s}{\beta})^{-\frac{1}{\gamma}}
 \end{equation*}
 
-其中$th$是一个异常分数的初始阈值，用来确定尾部区域，可以凭经验地设为正常数据的异常分数的一个较大的分位数，$\gamma$和$\beta$是GPD的形状和比例参数，是两个未知参数，我们用最大似然估计的方法得到参数$\hat{\gamma}$和$\hat{\beta}$，然后通过以下公式计算最终阈值$th_F$：
+其中$th$是一个异常分数的初始阈值，用来确定尾部区域，可以凭经验地设为正常数据的异常分数的一个较大的分位数，$\gamma$和$\beta$是GPD的形状和比例参数，是两个未知参数，可以用最大似然估计\cite{white1982maximum}的方法得到参数$\hat{\gamma}$和$\hat{\beta}$，然后通过以下公式计算最终阈值$th_F$：
 \begin{equation*}
   th_F \approx th + \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N_{th}})^{-\hat{\gamma}}-1)
 \end{equation*}
@@ -140,11 +140,11 @@
   F_1-Score = 2\times \frac { Precision \times Recall}{Precision + Recall}
 \end{equation*}
 
-其中$TP$、$TN$、$FP$、$FN$分别代表true positives、true negatives、false positives和 false negatives。$Precision$描绘的是实际异常占检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，单用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。对于一段真正的异常而言，检测到异常的点的个数以及检测出来的位置都反映了模型效果的不同，例如一段长度为10的异常，模型$A$检测到了其中的8个，而模型$B$只检测到了1个，那么相对而言前者的效果会更好；如果模型$A$在这段异常开始的第一个位置就检测到了异常，而模型$B$直到第5个点才检测到，那么在实际投入使用时，前者的效果一定是我们更想要，能够帮助工作人员更早地发现异常。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种point-wise的方法来对算法得到的结果进行调整然后再进行评估，具体就是对于一个真实的异常而言，如果我们的算法主要检测到了范围内的一个，那么整段异常就认为都被检测到。该评价方法就没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
+其中$TP$、$TN$、$FP$、$FN$分别代表true positives、true negatives、false positives和 false negatives。$Precision$描绘的是实际异常占检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，单用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。对于一段真正的异常而言，检测到异常的点的个数以及检测出来的位置都反映了模型效果的不同，例如一段长度为10的异常，模型$A$检测到了其中的8个，而模型$B$只检测到了1个，那么相对而言前者的效果会更好；如果模型$A$在这段异常开始的第一个位置就检测到了异常，而模型$B$直到第5个点才检测到，那么在实际投入使用时，前者的效果一定是我们更想要，能够帮助工作人员更早地发现异常。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种point-wise的方法来对算法得到的结果进行调整然后再进行评估，具体就是对于一个真实的异常而言，如果我们的算法主要检测到了范围内的一个，那么整段异常就认为都被检测到。该评价方法没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
 
-基于以上考虑，我们借用了\cite{tatbul2018precision}的新型的Precision和Recall的计算方式。
+基于以上考虑，本文借用了\cite{tatbul2018precision}的新型的Precision和Recall的计算方式。
 
-首先我们将异常表示成区间的集合，真实的异常为$R=[R_1,R_2,\dots,R_{N_r}]$，其中每个$R_i$代表一个区间的异常，我们不放人为$R_i.l$和$R_i.r$分别代表该区间的左右端点。同理$P=[P_1,P_2,\dots,P_{N_p}]$表示预测出来的异常。
+首先将异常表示成区间的集合，真实的异常为$R=[R_1,R_2,\dots,R_{N_r}]$，其中每个$R_i$代表一个区间的异常，不妨认为$R_i.l$和$R_i.r$分别代表该区间的左右端点。同理$P=[P_1,P_2,\dots,P_{N_p}]$表示预测出来的异常。
 \begin{equation*}
   Recall(R,P) = \frac{\sum_{i=1}^{N_r} Recall_T(R_i,P)}{N_r}
 \end{equation*}
@@ -159,12 +159,12 @@
 ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0, & otherwise \end{cases}
 \end{equation*}
 
-而相交性则需要考虑重叠的位置和大小的关系，此处我们认为对于一个异常来说，越开始检测到对我们来说越重要，因此我们将靠前的位置分配较大的权重，具体计算如图~\ref{algorithm:omega1}所示。
+而相交性则需要考虑重叠的位置和大小的关系，此处本文认为对于一段异常来说，越早检测到说明效果越好，因此将靠前的位置分配较大的权重，具体计算如算法~\ref{algorithm:omega1}所示。
 \begin{equation*}
   OverlapReward(R_i,P) = \sum_{j=1}^{N_p}\omega(R_i,R_i\cap P_j)
 \end{equation*}
 \begin{algorithm}
-  \caption{$\omega$ 计算方法1}
+  \caption{$\omega$ 原版计算方法\cite{tatbul2018precision}}
   \begin{algorithmic}
       \Function{$\omega$}{AnomalyRange, OverlapRange}
       \State DetectValue \gets 0
@@ -183,9 +183,9 @@ ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0
   \label{algorithm:omega1}
 \end{algorithm}
 
-意识到OverlapRange也一定是一个区间之后，我们可以将$\omega$的计算方式简化为如下：
+意识到$OverlapRange$也一定是一个区间之后，可以将$\omega$的计算方式简化为算法~\ref{algorithm:omega2}：
   \begin{algorithm}
-    \caption{$\omega$ 计算方法2}
+    \caption{$\omega$ 简化计算方法}
     \begin{algorithmic}
         \Function{$\omega$}{AnomalyRange, OverlapRange}
         \State len \gets length(AnomalyRange)
@@ -325,12 +325,11 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
   其中GetRange和Union是通过并查集来实现记录和维护某个位置所属的区间以及该区间的左右端点，算法中不再赘述。容易得知这样的计算复杂度为$O((N_r + \alpha(N))\times N)$，其中$\alpha(N)$是Ackerman函数的某个反函数，在很大一个范围内（超过$10^{80}$）可以认为是不大于4的一个常数，所以我们可以认为复杂度是较原先下降了一个数量级，实测原先需要4小时的计算仅需3秒就可以得出结果。
 \section{实验结果与分析}
-本章先对所有算法在所有阈值下的最好结果进行一些分析，再分析一下POT方法下的结果对比，然后再看时序模型与传统基于点的异常检测模型结合所带来的的收益是否符合预期，最后我们对各个算法的效率进行一定的分析。
+本章先对所有算法在所有阈值下的最好结果进行分析，再评估用POT方法确立阈值对结果造成的影响及其效率，然后对比一下传统基于点的异常检测模型与时序模型结合后与原模型的效果，最后我们对各个算法的效率进行比较。
 \subsection{最好结果}
 表~\ref{tab:best}为各个算法在枚举所有阈值之后得到的最好的评估结果，其中Random是随机将当前时刻分为正常或异常，OmniAnomaly是\cite{su2019robust}中提出的模型，在我们的框架内并没有实现，我们使用其公开的源代码进行了异常检测的结果获取然后放到我们的评估模块中进行评估，方便参考。
 \begin{table}
   \centering
-  
 \begin{tabular}{lccc}
   \toprule
           algorithm &  F1-Score &    Recall &  Precision \\
@@ -410,7 +409,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
     \label{tab:pot-lstm-vae}
 \end{table}
 
-\subsection{基于点的方法与时序模型结合带来的收益}
+\subsection{单点异常检测方法与时序模型结合后与原模型对比}
 表~\ref{tab:lstm-diff}展示了单点的异常检测模型与结合了时序模型LSTM之后的结果与原先结果的差异，均是在best条件下。
 
 \begin{table}
@@ -430,8 +429,13 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 可以看出原来用于单点异常检测的算法在与LSTM模型结合后检测效果都有了些许的提升，证明LSTM捕获时间依赖的能力确实能够帮助算法提升性能。
 
-\subsection{效率对比}
-图~\ref{fig:train:time}是所有算法的训练时间，可以看出结合了LSTM的模型训练所花的时间远远大于其他算法。Deep SVDD因为模型结构较为简单、而DAGMM因为算法原因需要选取非常大的batch size（实验中设置为1024）因此训练速度很快。
+\subsection{效率}
+图~\ref{fig:train:time}是所有算法的训练时间箱型图，可以看出
+\begin{enumerate}
+  \item 结合了LSTM的模型训练所花的时间普遍高于其他算法；
+  \item ConAD因为模型十分复杂、要训练多个假设，训练时间也偏长；
+  \item Deep SVDD因为模型结构较为简单、而DAGMM因为算法原因需要选取非常大的batch size（实验中设置为1024）因此训练速度很快。
+\end{enumerate}
 
 \begin{figure}[htbp]
   \centering
@@ -440,7 +444,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
   \label{fig:train:time}
 \end{figure}
 
-图~\ref{fig:test:time}是所有算法的检测时间，可以看到LSTM-VAE因为LSTM以及重构概率的计算要采样多次，所以检测时间最长，而ConAD和LSTM-ConAD则是因为本身模型过于复杂在检测时花费时间也较长。
+图~\ref{fig:test:time}是所有算法的检测时间箱型图，可以看到LSTM-VAE因为使用了时序模型LSTM以及重构概率的计算要采样多次取平均，所以检测时间最长，而ConAD和LSTM-ConAD则是因为本身模型过于复杂在检测时花费时间相对较长，其他算法在检测时花费时间差距不大。
 
 \begin{figure}[htbp]
   \centering
@@ -449,7 +453,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
   \label{fig:test:time}
 \end{figure}
 
-图~\ref{fig:pot:time}是所有算法用POT方法来确立阈值并评估的耗时，图~\ref{fig:eval:time}则是所有算法用枚举所有阈值并选取最好的评估结果的耗时，结果显示在评测方面，各算法差距并不大。
+图~\ref{fig:pot:time}是所有算法用POT方法来确立阈值的耗时箱型图，虽然耗时的中位数很低，但是异常点很多，最坏情况下甚至达到了1000秒以上的耗时，而且稳定性较差，难以真正落地用到生产环境中去。
 
 \begin{figure}[htbp]
   \centering
@@ -457,6 +461,8 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
   \caption{POT方法评估时间}
   \label{fig:pot:time}
 \end{figure}
+
+图~\ref{fig:eval:time}则是所有算法用枚举所有阈值并选取最好的评估结果的耗时箱型图，从中看出这部分时间的消耗较为稳定且快速，而且不依赖于算法的效果。
 
 \begin{figure}[htbp]
   \centering
