@@ -100,7 +100,7 @@
   \hat{F}_{th}(s) = P(S - th > s | S > th) \approx (1 + \frac{\gamma s}{\beta})^{-\frac{1}{\gamma}}
 \end{equation*}
 
-其中$th$是一个异常分数的初始阈值，用来确定尾部区域，可以凭经验地设为正常数据的异常分数的一个较大的分位数，$\gamma$和$\beta$是GPD的形状和比例参数，是两个未知参数，可以用最大似然估计\cite{white1982maximum}的方法得到参数$\hat{\gamma}$和$\hat{\beta}$，然后通过以下公式计算最终阈值$th_F$：
+其中$th$是一个异常分数的初始阈值，用来确定尾部区域，可以凭经验地设为正常数据的异常分数的一个较大的分位数，$\gamma$和$\beta$是GPD的形状和比例参数，是两个未知参数，可以用最大似然估计的方法得到参数$\hat{\gamma}$和$\hat{\beta}$，然后通过以下公式计算最终阈值$th_F$：
 \begin{equation*}
   th_F \approx th + \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N_{th}})^{-\hat{\gamma}}-1)
 \end{equation*}

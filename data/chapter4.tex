@@ -9,7 +9,7 @@
 本文设计的根因分析框架如图~\ref{fig:part2-overview}所示：
 \begin{figure}[htbp]
     \centering
-    \includegraphics[width=\textwidth]{part2-overview.png}
+    \includegraphics[width=\textwidth]{part2_overview.png}
     \caption{基于时间序列异常检测的根因分析系统框架}
     \label{fig:part2-overview}
   \end{figure}
@@ -194,7 +194,7 @@ w_{i,j} = \begin{cases} w_{i,j}, & if\ (i,j) \in E \cr \rho_{back} w_{j,i}, &\ i
 \subsection{baseline选取}
 本文选取的baseline为在异常检测之后根据自身的异常分数以及相连边的异常分数之和排序然后选取最高的作为根因，在结果输出时与我们的方法保持一致。
 \subsection{实验结果分析}
-该数据集一共有5批数据，分别有11、11、3、10和10个测试点，本文的方法与baseline的方法在各批数据的正确率如表~\ref{tab:rca:result}所示。 
+该数据集一共有5批数据，分别有11、11、3、10和10个测试点，本文的方法与baseline的方法在各批数据的正确率如表~\ref{tab:rca:result}所示。
 
 \begin{table}
   \centering
@@ -202,15 +202,15 @@ w_{i,j} = \begin{cases} w_{i,j}, & if\ (i,j) \in E \cr \rho_{back} w_{j,i}, &\ i
     \toprule
       & 第一批 & 第二批 & 第三批 & 第四批 & 第五批 & 总体\\
     \midrule
-    baseline &  1 & 0.91 & 1 & 0.9 & 0.91 & 0.93\\
-    ours & 0.91 & 0.91 & 0.67& 0.8 & 0.91 & 0.87\\
+    baseline &  0.91 & 0.91 & 1 & 0.9 & 0.91 & 0.91\\
+    ours & 0.64 & 0.73 & 1& 0.6 & 0.91 & 0.76\\
     \bottomrule
   \end{tabular}
   \caption{根因定位准确率对比}
   \label{tab:rca:result}
 \end{table}
 
-从中可以看出，使用随机游走的方法比直接在异常图上进行统计的方法准确率高出不少。而我们的方法未能准确检测的三个根因中有两个是根因和所得到的静态拓扑图完全没有关系的，而另一个则如图~\ref{fig:bad:case}所示。真正的根因是docker001的网络故障，而我们的算法定位到了os022的网络故障上，docker001在经过次数中排名第三位。所以在这种影响范围较小的情况下我们的算法准确性会出一点问题。而一些准确定位的故障其异常图如~\ref{fig:error:example}所示。
+从中可以看出，使用随机游走的方法比直接在异常图上进行统计的方法准确率高出十五个百分点。而我们的方法未能准确检测的三个根因中有两个是根因和所得到的静态拓扑图完全没有关系的，而另两个则如图~\ref{fig:bad:case}所示。真正的根因是docker001的网络故障，而我们的算法定位到了os022的网络故障上，docker001在经过次数中排名第三位。所以在这种影响范围较小的情况下我们的算法准确性会出一点问题。而一些准确定位的故障其异常图如~\ref{fig:error:example}所示。当出现容器网络这一类故障例如图~\ref{fig:error:docker:network}时，baseline的方法则有可能会定位到os022，而随机游走则会避免这一错误，通过在图上不断地游走，最后经过正确答案也就是docker007的次数最多，并且，当系统的规模扩大时，baseline针对单点的统计更有可能出错，因为当调用链的长度增加时，会出现多个节点的异常分数与边的异常分数之和极大的情况，而真正的根因则需要用随机游走的方式，通过模拟异常传播的方式才能从调用链上推断出来。
 \begin{figure}[htbp]
   \centering
   \includegraphics[width=\textwidth]{bad_case.png}
@@ -218,7 +218,6 @@ w_{i,j} = \begin{cases} w_{i,j}, & if\ (i,j) \in E \cr \rho_{back} w_{j,i}, &\ i
   \label{fig:bad:case}
 \end{figure}
 
-由此我们可以得到如图~\ref{fig:error:example}所示的故障示例，其中点的大小代表点的异常分数的大小，而边的粗细代表边的异常分数的大小。
 \begin{figure}[htbp]
   \centering
   \begin{subfigure}[b]{\textwidth}
@@ -241,13 +240,13 @@ w_{i,j} = \begin{cases} w_{i,j}, & if\ (i,j) \in E \cr \rho_{back} w_{j,i}, &\ i
       \centering
       \includegraphics[width=\textwidth]{docker_cpu_error.png}
       \caption{容器cpu压测}
-      \label{fig:error:db}
+      \label{fig:error:docker}
     \end{minipage}
     \begin{minipage}[t]{0.5\linewidth}
       \centering
       \includegraphics[width=\textwidth]{docker_network_error.png}
       \caption{容器网络故障}
-      \label{fig:error:os}
+      \label{fig:error:docker:network}
     \end{minipage}
   \end{subfigure}
   \caption{AIOPS2020挑战赛中故障示例}
