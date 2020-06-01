@@ -12,23 +12,22 @@
 
 
 \section{主要工作}
-本文的研究工作分为异常检测和根因分析两个部分。
-
-在异常检测方面，本文的主要工作如下：
+本文的研究工作主要如下：
 
 \begin{enumerate}
-    \item 设计了一个适用于深度学习方法的多元时间序列异常检测框架，使用统一的数据集和评价方式进行评估，对各个算法进行了性能和效率方面的综合比较；
-    \item 选择并实现了LSTM\footnote{Long Short-Term Memory，长短期记忆人工神经网络}、AE\footnote{AutoEncoder，自编码器}、VAE\cite{an2015variational}、DAGMM\cite{zong2018deep}、Deep SVDD\cite{ruff2018deep}等算法；
-    \item 将单点异常检测算法与深度学习的时间序列模型结合改进提出了LSTM-VAE、LSTM-AE、LSTM-DAGMM以及设计实现了将重构和预测结合起来的AE-Predictor算法，并进行了与原模型实验结果的对比；
-    \item 采用了由极值理论推到得出的的POT\cite{siffer2017anomaly}方法来自动确立算法的阈值，而不依赖与验证集以及对原数据的强分布假设；
-    \item 实现了针对时间序列数据的Precision和Recall的新型计算方式\cite{tatbul2018precision}，并且在使用时对效率进行了改进，当枚举所有阈值算Precision和Recall的时候用并查集和增量更新的方式使得计算复杂度下降了一个数量级。
-\end{enumerate}
-
-在根因分析方面，本文的主要工作如下：
-
-\begin{enumerate}
-    \item 本文将时间序列异常检测的结果直接应用于异常传播图的构建中，与随机游走相结合，可解释性更强；
-    \item 在AIOPS2020挑战赛上进行实验，对算法的准确率进行了评估，可解释性进行了展示。
+    \item 用深度学习的方法对单点的多维时间序列数据进行异常检测。具体包括：
+        \begin{itemize}
+        \item 设计了一个适用于深度学习方法的多元时间序列异常检测框架，使用统一的数据集和评价方式进行评估，对各个算法进行了性能和效率方面的综合比较；
+        \item 选择并实现了LSTM\footnote{Long Short-Term Memory，长短期记忆人工神经网络}、AE\footnote{AutoEncoder，自编码器}、VAE\cite{an2015variational}、DAGMM\cite{zong2018deep}、Deep SVDD\cite{ruff2018deep}等算法；
+        \item 将单点异常检测算法与深度学习的时间序列模型结合改进提出了LSTM-VAE、LSTM-AE、LSTM-DAGMM以及设计实现了将重构和预测结合起来的AE-Predictor算法，并进行了与原模型实验结果的对比；
+        \item 采用了由极值理论推导得出的的POT\cite{siffer2017anomaly}方法来自动确立算法的阈值，而不依赖于验证集以及对原数据的强分布假设；
+        \item 实现了针对时间序列数据的Precision和Recall的新型计算方式\cite{tatbul2018precision}，并且在使用时对效率进行了改进，当枚举所有阈值算Precision和Recall的时候用并查集和增量更新的方式使得计算复杂度下降了一个数量级。
+        \end{itemize}
+    \item 用随机游走的方式在有异常检测结果的情况下进行根因的定位，具体包括：
+        \begin{itemize}
+        \item 提出了一个将时间序列异常检测的结果直接应用于异常传播图的构建中，与随机游走相结合的方法，可解释性更强；
+        \item 在AIOPS2020挑战赛上进行实验，对算法的准确率进行了评估，可解释性进行了展示。
+        \end{itemize}
 \end{enumerate}
 \section{论文结构}
 本文内容分为五章：
@@ -37,5 +36,5 @@
     \item 第二章介绍相关工作，主要是异常检测和根因分析两方面，前者集中在近些年来用深度学习做异常检测的工作，后者集中介绍通过构建调用图和随机游走的方法进行根因分析的工作；
     \item 第三章介绍本文设计实现的基于深度学习的时间序列异常检测框架，并且对框架的各部分进行详细的介绍；
     \item 第四章介绍本文设计实现的基于时间序列异常检测的根因分析算法，以AIOPS2020挑战赛为背景介绍算法的实现细节；
-    \item 第五章总结本文，揭示目前工作存在的一些不足，并对未来工作进行展望。
+    \item 第五章总结本文，并对未来工作进行展望。
 \end{itemize}

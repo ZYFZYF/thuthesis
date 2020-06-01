@@ -126,12 +126,21 @@
 \usepackage{algorithmicx}
 \usepackage{algpseudocode}
 \usepackage{fixltx2e}
+%\usepackage{mathabx}
 
 \renewcommand{\algorithmicrequire}{\textbf{输入:}}
 \renewcommand{\algorithmicensure}{\textbf{输出:}}
 \MakeRobust{\Call}
 
 \makeatletter
+\def\widebreve{\mathpalette\wide@breve}
+\def\wide@breve#1#2{\sbox\z@{$#1#2$}%
+     \mathop{\vbox{\m@th\ialign{##\crcr
+\kern0.08em\brevefill#1{0.8\wd\z@}\crcr\noalign{\nointerlineskip}%
+                    $\hss#1#2\hss$\crcr}}}\limits}
+\def\brevefill#1#2{$\m@th\sbox\tw@{$#1($}%
+  \hss\resizebox{#2}{\wd\tw@}{\rotatebox[origin=c]{90}{\upshape(}}\hss$}
+
 \newenvironment{breakablealgorithm}
   {% \begin{breakablealgorithm}
    \begin{center}
@@ -152,6 +161,7 @@
   }
   \normalsize
 \makeatother
+
 
 \usepackage{subcaption}
 \usepackage{diagbox}
