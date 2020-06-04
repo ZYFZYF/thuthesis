@@ -472,6 +472,8 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 可以看出原来用于单点异常检测的算法在与LSTM模型结合后检测效果都有了些许的提升，证明LSTM捕获时间依赖的能力确实能够帮助算法提升性能。
 
 \subsection{效率}
+本节中将各个算法在28台机器上运行各个步骤所花时间处理得到箱式图，其中黄线为中位数$Q_3$，矩形的上下两边分别表示上四分位数$Q_2$和下四分位数$Q_4$，上下两条独立的黑线则分别是上边缘$Q_1$和下边缘$Q_4$，分别是原数据中去除异常值后的最小值和最大值，空心圆点代表异常值，原数据中小于$Q_2-1.5\times(Q_4-Q_2)$或者大于$Q_4 + 1.5\times(Q_4-Q_2)$的数据被认为是异常值。
+
 图~\ref{fig:train:time}是所有算法的训练时间箱型图，可以看出
 \begin{enumerate}
   \item 结合了LSTM的模型训练所花的时间普遍高于其他算法；
@@ -481,7 +483,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{train_time.png}
+  \includegraphics[width=0.8\textwidth]{train_time.png}
   \caption{训练时间}
   \label{fig:train:time}
 \end{figure}
@@ -490,7 +492,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{predict_time.png}
+  \includegraphics[width=0.8\textwidth]{predict_time.png}
   \caption{检测时间}
   \label{fig:test:time}
 \end{figure}
@@ -499,7 +501,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{spot_time.png}
+  \includegraphics[width=0.8\textwidth]{spot_time.png}
   \caption{POT方法评估时间}
   \label{fig:pot:time}
 \end{figure}
@@ -508,7 +510,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=\textwidth]{best_eval_time.png}
+  \includegraphics[width=0.8\textwidth]{best_eval_time.png}
   \caption{枚举所有阈值评估时间}
   \label{fig:eval:time}
 \end{figure}
