@@ -21,9 +21,9 @@
         \item 选择并实现了LSTM\footnote{Long Short-Term Memory，长短期记忆人工神经网络}、AE\footnote{AutoEncoder，自编码器}、VAE\cite{an2015variational}、DAGMM\cite{zong2018deep}、Deep SVDD\cite{ruff2018deep}等算法；
         \item 将单点异常检测算法与深度学习的时间序列模型结合改进提出了LSTM-VAE、LSTM-AE、LSTM-DAGMM以及设计实现了将重构和预测结合起来的AE-Predictor算法，并进行了与原模型实验结果的对比；
         \item 采用了由极值理论推导得出的的POT\cite{siffer2017anomaly}方法来自动确立算法的阈值，而不依赖于验证集以及对原数据的强分布假设；
-        \item 实现了针对时间序列数据的Precision和Recall的新型计算方式\cite{tatbul2018precision}，并且在使用时对效率进行了改进，当枚举所有阈值算Precision和Recall的时候用并查集和增量更新的方式使得计算复杂度下降了一个数量级。
+        \item 实现了针对时间序列数据的Precision和Recall的新型计算方式\cite{tatbul2018precision}，并且在枚举所有阈值算Precision和Recall的时候用并查集和增量更新的方式使得计算复杂度下降了一个数量级。
         \end{itemize}
-    \item 用随机游走的方式在有异常检测结果的情况下进行根因的定位，具体包括：
+    \item 用随机游走的方式结合异常检测的结果进行根因的定位，具体包括：
         \begin{itemize}
         \item 提出了一个将时间序列异常检测的结果直接应用于异常传播图的构建中，与随机游走相结合的方法，可解释性更强；
         \item 在AIOPS2020挑战赛上进行实验，对算法的准确率进行了评估，可解释性进行了展示。

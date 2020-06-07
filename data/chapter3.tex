@@ -10,7 +10,7 @@
   \includegraphics[width=\textwidth]{another_anomaly_example.png}
   \caption{多维时间序列数据中的一个异常示例，数据采集自SMD\cite{su2019robust}数据集}
   \label{fig:anomaly_example}
-\end{figure} 
+\end{figure}
 
 \section{框架设计}
 本文实现的基于深度学习的时间序列异常检测框架如图~\ref{fig:part1_overview}。
@@ -130,8 +130,10 @@
       \Ensure $y$
       \State $t$ \gets \ $level$th quantile of $s_{train}$
       \State $Tail$ \gets \ last $1-level$ percentile of $s_{train}$
+      \State $N'$ \gets $length(s_{train})$
+      \State $N_t$ \gets $length(Tail)$
       \State $\hat{\gamma}, \hat{\beta}$ = \Call{MaximumLikelihoodEstimation}{$Tail$}
-      \State $threshold = t + \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N_{t}})^{-\hat{\gamma}}-1)$ 
+      \State $threshold = t + \frac{\hat{\beta}}{\hat{\gamma}}((\frac{qN'}{N_{t}})^{-\hat{\gamma}}-1)$
       \ForAll{$s_i \in S_{test}$}
       \If{$s_i > threshold$}
       \State $y_i = 1$
@@ -182,13 +184,13 @@
   F_1-Score = 2\times \frac { Precision \times Recall}{Precision + Recall}
 \end{equation*}
 
-其中$TP$、$TN$、$FP$、$FN$分别代表true positives、true negatives、false positives和 false negatives。$Precision$描绘的是实际异常中检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，只用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。对于一段真正的异常而言，检测到异常的点的个数以及检测出来的位置都反映了模型效果的不同，例如一段长度为10的异常，模型$A$检测到了其中的8个，而模型$B$只检测到了1个，那么相对而言前者的效果会更好；如果模型$A$在这段异常开始的第一个位置就检测到了异常，而模型$B$直到第5个点才检测到，那么在实际投入使用时，前者的效果一定更想得到的，能够帮助工作人员更早地发现异常。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种point-wise的方法来对算法得到的结果进行调整然后再进行评估，具体就是对于一个真实的异常而言，如果算法主要检测到了范围内的一个位置，那么整段异常就认为都被检测到。该评价方法没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
+其中$TP$、$TN$、$FP$、$FN$分别代表true positives、true negatives、false positives和 false negatives。$Precision$描绘的是实际异常中检测出的所有异常的比例，而$Recall$描绘了所有的异常中被检测到的比例，直觉上来看，两者是对立的，只用其中一个用来评价检测器的性能是不合理的。但在单点的异常检测中，将它们结合在一起的$F_1-Score$已经被认为是公认的有效的评价方式。但对于时间序列数据的异常检测来说，这样的评价就不太准确。主要原因是因为在时间序列数据中异常的发生通常是连续的一段，如图\ref{fig:anomaly_example}所示。对于一段真正的异常而言，检测到异常的点的个数以及检测出来的位置都反映了模型效果的不同，例如一段长度为10的异常，模型$A$检测到了其中的8个，而模型$B$只检测到了1个，那么相对而言前者的效果会更好；如果模型$A$在这段异常开始的第一个位置就检测到了异常，而模型$B$直到第5个点才检测到，那么在实际投入使用时，前者的效果是更想得到的，能够帮助工作人员更早地发现异常。之前的一些工作\cite{xu2018unsupervised}\cite{su2019robust}用了一种比较简单的方法来对算法得到的结果进行调整然后再进行评估：对于一个真实的异常而言，如果算法主要检测到了范围内的一个位置，那么整段异常就认为都被检测到。该评价方法没有考虑到检测到的点的位置和检测到的点数的影响，会造成评价指标的虚高。
 
 基于以上考虑，本文借用了\cite{tatbul2018precision}的新型的Precision和Recall的计算方式，并根据本文针对的问题进行了一些简化和计算效率上的优化。
 
 具体来讲首先将异常表示成区间的集合，真实的异常为$R=[R_1,R_2,\dots,R_{N_r}]$，其中每个$R_i$代表一个区间的异常，不妨认为$R_i.l$和$R_i.r$分别代表该区间的左右端点。同理$P=[P_1,P_2,\dots,P_{N_p}]$表示预测出来的异常。
 \begin{equation*}
-  Recall(R,P) = \frac{\sum_{i=1}^{N_r} Recall_T(R_i,P)}{N_r}
+  Recall(R,P) = \frac{\sum\limits_{i=1}^{N_r} Recall_T(R_i,P)}{N_r}
 \end{equation*}
 
 其中$Recall_T$的计算由两部分加权组成：分别考虑了存在性以及位置性。
@@ -203,7 +205,7 @@ ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0
 
 而相交性则需要考虑重叠的位置和大小的关系，此处本文认为对于一段异常来说，越早检测到说明效果越好，因此将靠前的位置分配较大的权重，具体计算如算法~\ref{algorithm:omega1}所示。
 \begin{equation*}
-  OverlapReward(R_i,P) = \sum_{j=1}^{N_p}\omega(R_i,R_i\cap P_j)
+  OverlapReward(R_i,P) = \sum\limits_{j=1}^{N_p}\omega(R_i,R_i\cap P_j)
 \end{equation*}
 \begin{algorithm}
   \caption{$\omega$ 原版计算方法\cite{tatbul2018precision}}
@@ -225,7 +227,7 @@ ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0
   \label{algorithm:omega1}
 \end{algorithm}
 
-意识到$OverlapRange$也一定是一个区间之后，可以将$\omega$的计算方式简化为算法~\ref{algorithm:omega2}：
+意识到$OverlapRange$也一定是一个区间之后，本文将$\omega$的计算方式简化为算法~\ref{algorithm:omega2}：
   \begin{algorithm}
     \caption{$\omega$ 简化计算方法}
     \begin{algorithmic}[1]
@@ -244,7 +246,7 @@ ExistenceReward(R_i,P) = \begin{cases} 1, & \ \exists \  | R_i \cap P_j|>1 \cr 0
 新型Precision的计算方式类似：
 
 \begin{equation*}
-Precision(R,P) = \frac{\sum_{i=1}^{N_p}Precision_T(R,P_i)}{N_p}
+Precision(R,P) = \frac{\sum\limits_{i=1}^{N_p}Precision_T(R,P_i)}{N_p}
 \end{equation*}
 
 区别是$Precision_t(R,P_i)$的计算不需要考虑$ExistenceReward$，直接按照检测到的位置计算贡献即可:
@@ -365,7 +367,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
     \end{algorithmic}
   \end{breakablealgorithm}
 
-  其中GetRange和Union是通过并查集来实现记录和维护某个位置所属的区间以及该区间的左右端点，算法中不再赘述。容易得知这样的计算复杂度为$O((N_r + \alpha(N))\times N)$，其中$\alpha(N)$是Ackerman函数的某个反函数，在很大一个范围内（超过$10^{80}$）可以认为是不大于4的一个常数，所以可以认为复杂度是较原先下降了一个数量级，实测原先需要4小时的计算仅需3秒就可以得出结果。
+  其中GetRange和Union是通过并查集来实现记录和维护某个位置所属的区间以及该区间的左右端点，算法中不再赘述。这样的计算复杂度为$O((N_r + \alpha(N))\times N)$，其中$\alpha(N)$是Ackerman函数的某个反函数，在很大一个范围内（超过$10^{80}$）可以认为是不大于4的一个常数，所以可以认为复杂度是较原先下降了一个数量级，实测原先需要4小时的计算仅需3秒就可以得出结果。
 \section{实验结果与分析}
 本章先对所有算法在所有阈值下的最好结果进行分析，再评估用POT方法确立阈值对结果造成的影响及其可用性，然后对比一下传统基于点的异常检测模型与时序模型结合后与原模型的效果，最对各个算法的效率进行比较。
 \subsection{最好结果}
@@ -472,7 +474,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 可以看出原来用于单点异常检测的算法在与LSTM模型结合后检测效果都有了些许的提升，证明LSTM捕获时间依赖的能力确实能够帮助算法提升性能。
 
 \subsection{效率}
-本节中将各个算法在28台机器上运行各个步骤所花时间处理得到箱式图，其中黄线为中位数$Q_3$，矩形的上下两边分别表示上四分位数$Q_2$和下四分位数$Q_4$，上下两条独立的黑线则分别是上边缘$Q_1$和下边缘$Q_4$，分别是原数据中去除异常值后的最小值和最大值，空心圆点代表异常值，原数据中小于$Q_2-1.5\times(Q_4-Q_2)$或者大于$Q_4 + 1.5\times(Q_4-Q_2)$的数据被认为是异常值。
+本节中将各个算法在28台机器上运行各个步骤所花时间处理得到箱式图，其中黄线为中位数$Q_3$，矩形的上下两边分别表示上四分位数$Q_2$和下四分位数$Q_4$，上下两条独立的黑线则分别是上边缘$Q_1$和下边缘$Q_5$，分别是原数据中去除异常值后的最小值和最大值，空心圆点代表异常值，原数据中小于$Q_2-1.5\times(Q_4-Q_2)$或者大于$Q_4 + 1.5\times(Q_4-Q_2)$的数据被认为是异常值。
 
 图~\ref{fig:train:time}是所有算法的训练时间箱型图，可以看出
 \begin{enumerate}
@@ -483,7 +485,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{train_time.png}
+  \includegraphics[width=0.9\textwidth]{train_time.png}
   \caption{训练时间}
   \label{fig:train:time}
 \end{figure}
@@ -492,7 +494,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{predict_time.png}
+  \includegraphics[width=0.9\textwidth]{predict_time.png}
   \caption{检测时间}
   \label{fig:test:time}
 \end{figure}
@@ -501,7 +503,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{spot_time.png}
+  \includegraphics[width=0.9\textwidth]{spot_time.png}
   \caption{POT方法评估时间}
   \label{fig:pot:time}
 \end{figure}
@@ -510,7 +512,7 @@ Precision_T(R,P_i) = \sum_{j=1}^{N_r}\omega(P_i,P_i\cap R_j)
 
 \begin{figure}[htbp]
   \centering
-  \includegraphics[width=0.8\textwidth]{best_eval_time.png}
+  \includegraphics[width=0.9\textwidth]{best_eval_time.png}
   \caption{枚举所有阈值评估时间}
   \label{fig:eval:time}
 \end{figure}
