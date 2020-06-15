@@ -16,10 +16,10 @@
 \begin{document}
 
 % 封面
- \maketitle
+\maketitle
 
 % 使用授权的说明
- \copyrightpage
+\copyrightpage[myauth.pdf]
 
 \frontmatter
 \input{data/abstract.tex}
@@ -58,18 +58,18 @@
 \input{data/acknowledgements}
 
 % 声明
- \statement
+\statement[mystatement.pdf] 
 
 % 附录
 \appendix
-%\input{data/appendix-survey}       % 本科生：外文资料的调研阅读报告
+\input{data/appendix-survey}       % 本科生：外文资料的调研阅读报告
 % \input{data/appendix-translation}  % 本科生：外文资料的书面翻译
-% \input{data/appendix}
+% \input{data/appendix} 
 
 % 个人简历
 % \input{data/resume}
 
 % 本科生的综合论文训练记录表
-\includepdf[pages=-]{scan-record.pdf}
+\includepdf[pages=-]{赵鋆峰记录表.pdf}
 
 \end{document}
