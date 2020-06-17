@@ -1,75 +1,19 @@
-% !TeX encoding = UTF-8
-% !TeX program = latexmk
-% !TeX spellcheck = en_US
+\documentclass[degree=master]{thuthesis}
 
-\documentclass[degree=bachelor]{thuthesis}
-  % 学位 degree:
-  %   doctor | master | bachelor | postdoc
-  % 学位类型 degree-type:
-  %   academic（默认）| professional
-
-
-% 论文基本配置，加载宏包等全局配置
-\input{thusetup.tex}
-
+\thusetup{
+  author = {赵\hbox{\lower-0.67ex\hbox{\scalebox{0.6}[1]{均}}\lower.2ex\hbox{\kern-1em \scalebox{0.5}[0.5]{金}}}峰},
+  title  = {云网络下的异常检测系统设计与实现}
+}
 
 \begin{document}
 
-% 封面
-\maketitle
 
-% 使用授权的说明
-\copyrightpage[myauth.pdf]
+\spine % 使用默认标题和默认作者
 
-\frontmatter
-\input{data/abstract.tex}
+\spine[使用默认作者的标题]
 
-% 目录
-\tableofcontents
+\spine[同时修改标题和作者的标题][尼瑞薛]
 
-% 符号对照表
-%\input{data/denotation}
-
-
-% 正文部分
-\mainmatter
-\input{data/chapter1}
-\input{data/chapter2}
-\input{data/chapter3}
-\input{data/chapter4}
-\input{data/chapter5}
-
-
-% 其它部分
-\backmatter
-
-%% 本科生要求的几个索引。
-\listoffigures    % 插图索引
-\listoftables     % 表格索引
-%\listofequations  % 公式索引
-
-% 参考文献
-% \bibliographystyle{thuthesis-numeric}      % 顺序编码制
-% \bibliographystyle{thuthesis-author-year}  % 著者-出版年制
-\bibliographystyle{thuthesis-bachelor}     % 本科生参考文献的著录格式
-\bibliography{ref/refs}
-
-% 致谢
-\input{data/acknowledgements}
-
-% 声明
-\statement[mystatement.pdf] 
-
-% 附录
-\appendix
-\input{data/appendix-survey}       % 本科生：外文资料的调研阅读报告
-% \input{data/appendix-translation}  % 本科生：外文资料的书面翻译
-% \input{data/appendix} 
-
-% 个人简历
-% \input{data/resume}
-
-% 本科生的综合论文训练记录表
-\includepdf[pages=-]{赵鋆峰记录表.pdf}
-
+% 中英文混合时需要微调
+\spine[清华大学学位 \raisebox{-5pt}{\LaTeX} 论文模板 \raisebox{-5pt}{v\version} 样例]
 \end{document}
